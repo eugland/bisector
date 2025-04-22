@@ -1,4 +1,5 @@
 def sanitize_input(text):
+    print(f"[AUDIT] raw input: {text}")  # <-- new logging
     return ''.join(c for c in text if c not in {'<', '>'})
 
 if __name__ == '__main__':
