@@ -41,7 +41,7 @@ def main():
 
         output, _, _ = run_cmd("git bisect log")
         print('output: ', output)
-        if "is the first bad commit" in output:
+        if "first bad commit" in output:
             print("\nGit bisect complete.")
             print(output)
             break
