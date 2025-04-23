@@ -3,6 +3,9 @@ import subprocess
 
 REPO_PATH = os.getcwd()
 
+REPO_PATH = 'C:\\Users\\eugen\\Documents\\testground'
+TARGET_PATH = 'gamerepo/game.py'
+
 
 def run_cmd(cmd):
     try:
@@ -12,6 +15,33 @@ def run_cmd(cmd):
         return stdout, stderr, result.returncode
     except Exception as e:
         return "", str(e), 1
+
+def print_target_file_or_function():
+    target_path = os.path.join(REPO_PATH, TARGET_PATH)
+    if os.path.isfile(target_path):
+        print(f"\nContents of file {TARGET_PATH} at current commit:\n")
+        with open(target_path, 'r', encoding='utf-8', errors='ignore') as f:
+            print(f.read())
+    else:
+        # Attempt to locate a function in Python code
+        print(f"\nSearching for function or identifier: {TARGET_PATH}\n")
+        found = False
+        for root, _, files in os.walk(REPO_PATH):
+            for file in files:
+                if file.endswith(".py"):
+                    file_path = os.path.join(root, file)
+                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        lines = f.readlines()
+                        for i, line in enumerate(lines):
+                            if TARGET_PATH in line:
+                                print(f"Found in {file_path}, line {i+1}:")
+                                print("".join(lines[max(0, i-2):i+3]))
+                                found = True
+                                break
+                    if found:
+                        break
+        if not found:
+            print(f"[Could not locate '{TARGET_PATH}' as a file or function]")
 
 
 def prompt_user():
@@ -32,6 +62,9 @@ def main():
         current_commit, _, _ = run_cmd("git rev-parse HEAD")
         print(f"\nCurrently at commit: {current_commit}")
 
+        if TARGET_PATH:
+            print_target_file_or_function()
+            
         choice = prompt_user()
         if choice == "c":
             print("Bisect cancelled by user.")
