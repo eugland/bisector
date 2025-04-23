@@ -74,11 +74,10 @@ def main():
     print("Starting git bisect...")
     run_cmd(f"git bisect start {head_commit} {root_commit}")
 
-    last_commit = head_commit
+    last_commit = None
+    current_commit = get_commit_hash("HEAD")
 
     while True:
-        current_commit = get_commit_hash("HEAD")
-
         if current_commit == last_commit:
             print("No new commit to compare.")
         else:
@@ -93,8 +92,16 @@ def main():
             summarize_diff_files(file_diffs)
 
             is_good = prompt_user("Is this commit good?")
-            run_cmd(f"git bisect {'good' if is_good else 'bad'}")
+            outs, _, _ = run_cmd(f"git bisect {'good' if is_good else 'bad'}")
             last_commit = current_commit
+            import re
+            match = re.search(r'\[([0-9a-f]{40})\]', outs)
+
+            if match:
+                current_commit = match.group(1)
+            else:
+                # Fallback to retrieving the current HEAD commit hash
+                current_commit = get_commit_hash("HEAD")
 
         log = run_cmd("git bisect log")
         if "is the first bad commit" in log:
