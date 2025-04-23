@@ -10,6 +10,8 @@ def run_cmd(cmd):
     result = subprocess.run(cmd, cwd=REPO_PATH, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     if result.returncode != 0:
         print(f"Error: {result.stderr}")
+    if not result or not result.stdout:
+        return f"Command failed: {cmd}"
     return result.stdout.strip()
 
 
@@ -92,7 +94,8 @@ def main():
             summarize_diff_files(file_diffs)
 
             is_good = prompt_user("Is this commit good?")
-            outs, _, _ = run_cmd(f"git bisect {'good' if is_good else 'bad'}")
+            outs = run_cmd(f"git bisect {'good' if is_good else 'bad'}")
+            print("outs: ", outs)
             last_commit = current_commit
             import re
             match = re.search(r'\[([0-9a-f]{40})\]', outs)
