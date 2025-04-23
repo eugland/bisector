@@ -52,3 +52,7 @@ Thus, \( P \) may not strictly satisfy the monotonicity assumption:
 ```
 
 To further complicate semantic similarity detection, many software projects engage in parallel development, wherein code fragments are derived or adapted from a common upstream repository but evolve independently in downstream forks. This phenomenon occurs when two systems share sufficiently similar functional goals, yet operate under significantly different architectural or contextual constraints. A canonical example of this is the relationship between Microsoft Edge and Google Chromium, where both browsers share a common codebase but diverge in platform integration, telemetry, and feature-specific adaptations.
+
+- existing automatic problem locator often works on the same temporal domain meaning that it checks where in the current file at this point in time is the error. 
+
+- the idea is check current plan then next plan then 
