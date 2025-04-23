@@ -2,10 +2,8 @@ import os
 import subprocess
 import shutil
 import difflib
-import json
 
 REPO_PATH = os.getcwd()
-STATE_FILE = ".bisect_state.json"
 
 
 def run_cmd(cmd):
@@ -29,28 +27,21 @@ def get_all_files():
     return file_list
 
 
-def save_repo_state(path=".repo_snapshot"):
-    if os.path.exists(path):
-        shutil.rmtree(path)
-    os.makedirs(path, exist_ok=True)
-    for file in get_all_files():
-        dest = os.path.join(path, file)
-        os.makedirs(os.path.dirname(dest), exist_ok=True)
-        shutil.copy2(os.path.join(REPO_PATH, file), dest)
+def get_file_content_at_commit(commit, filepath):
+    result = run_cmd(f"git show {commit}:{filepath}")
+    return result.splitlines() if result else []
 
 
-def diff_between_commits(commit1, commit2):
-    return run_cmd(f"git diff {commit1} {commit2}")
-
-
-def save_state_file(data):
-    with open(STATE_FILE, "w") as f:
-        json.dump(data, f)
-
-
-def load_state_file():
-    with open(STATE_FILE, "r") as f:
-        return json.load(f)
+def summarize_diff_files(file_diffs):
+    print("\n[LLM Summary] Here's what changed:")
+    for filename, diff in file_diffs.items():
+        print(f"\nFile: {filename}")
+        for line in diff:
+            if line.startswith('+'):
+                print("[Added]", line)
+            elif line.startswith('-'):
+                print("[Removed]", line)
+    print("------------------\n")
 
 
 def prompt_user(msg):
@@ -58,18 +49,6 @@ def prompt_user(msg):
         choice = input(f"{msg} [g]ood/[b]ad: ").strip().lower()
         if choice in ["g", "b"]:
             return choice == "g"
-
-
-def summarize_diff(diff_text):
-    # Placeholder LLM summary logic
-    print("\n[LLM Summary] Here's what changed:")
-    print("------------------")
-    for line in diff_text.splitlines():
-        if line.startswith("+") and not line.startswith("+++"):
-            print("[Added]", line)
-        elif line.startswith("-") and not line.startswith("---"):
-            print("[Removed]", line)
-    print("------------------\n")
 
 
 def main():
@@ -82,37 +61,40 @@ def main():
     print(f"Root commit (good): {root_commit}\n")
 
     print("Saving snapshot of current repo state...")
-    save_repo_state()
+    save_path = ".repo_snapshot"
+    if os.path.exists(save_path):
+        shutil.rmtree(save_path)
+    os.makedirs(save_path, exist_ok=True)
+    for file in get_all_files():
+        dest = os.path.join(save_path, file)
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        shutil.copy2(os.path.join(REPO_PATH, file), dest)
     print("Snapshot saved.\n")
-
-    save_state_file({
-        "head_commit": head_commit,
-        "root_commit": root_commit,
-        "last_commit": head_commit
-    })
 
     print("Starting git bisect...")
     run_cmd(f"git bisect start {head_commit} {root_commit}")
 
+    last_commit = head_commit
+
     while True:
-        state = load_state_file()
         current_commit = get_commit_hash("HEAD")
 
-        if current_commit == state["last_commit"]:
+        if current_commit == last_commit:
             print("No new commit to compare.")
-            log = run_cmd("git bisect log")
-            print("Current log:", log)
-            break
         else:
-            print("\n--- Commit Diff Summary ---")
-            diff = diff_between_commits(state["last_commit"], current_commit)
-            summarize_diff(diff)
+            print("\n--- File Content Diff ---")
+            file_diffs = {}
+            for file in get_all_files():
+                before = get_file_content_at_commit(last_commit, file)
+                after = get_file_content_at_commit(current_commit, file)
+                if before != after:
+                    diff = list(difflib.unified_diff(before, after, lineterm=''))
+                    file_diffs[file] = diff
+            summarize_diff_files(file_diffs)
 
             is_good = prompt_user("Is this commit good?")
             run_cmd(f"git bisect {'good' if is_good else 'bad'}")
-
-            state["last_commit"] = current_commit
-            save_state_file(state)
+            last_commit = current_commit
 
         log = run_cmd("git bisect log")
         if "is the first bad commit" in log:
@@ -122,7 +104,7 @@ def main():
     revert = input("Do you want to reset to HEAD state? [y/N]: ").strip().lower()
     if revert == "y":
         run_cmd("git bisect reset")
-        run_cmd(f"git checkout {state['head_commit']}")
+        run_cmd(f"git checkout {head_commit}")
         print("Restored to original HEAD state.")
 
 
