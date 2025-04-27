@@ -154,7 +154,7 @@ class GitBisectCLI:
         print(f"Using working repository path: {repo.work_path}")
         print(f"Target file: {repo.target_path}")
 
-        bisect = BisectSession(repo, OpenRouterSummarizer(self.problem))
+        bisect = BisectSession(repo, GPTDiffSummarizer(self.problem))
         bisect.run()
 
         revert = input("keep work directory[y/N]: ").strip().lower()

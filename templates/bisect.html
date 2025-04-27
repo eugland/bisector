@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Bisect Session</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #eef2f7;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 30px;
+        }
+        .header {
+            margin-bottom: 20px;
+        }
+        .commit {
+            font-size: 18px;
+            color: #555;
+        }
+        .content-box {
+            width: 90%;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            overflow-x: auto;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .summary {
+            margin-top: 20px;
+            font-size: 16px;
+            color: #666;
+        }
+        form {
+            margin-top: 30px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button[name="feedback"][value="good"] {
+            background-color: #28a745;
+            color: white;
+        }
+        button[name="feedback"][value="good"]:hover {
+            background-color: #218838;
+        }
+        button[name="feedback"][value="bad"] {
+            background-color: #dc3545;
+            color: white;
+        }
+        button[name="feedback"][value="bad"]:hover {
+            background-color: #c82333;
+        }
+        button[name="feedback"][value="cancel"] {
+            background-color: #6c757d;
+            color: white;
+        }
+        button[name="feedback"][value="cancel"]:hover {
+            background-color: #5a6268;
+        }
+        #loading {
+            display: none;
+            font-size: 16px;
+            color: #777;
+        }
+        .bad-commit-highlight {
+            color: red;
+            font-weight: bold;
+            margin-top: 20px;
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h2>Currently at Commit:</h2>
+    <div class="commit">{{ commit }}</div>
+</div>
+
+<div class="content-box">
+    <h3>File Content:</h3>
+    <pre id="file-content">{{ file_content }}</pre>
+</div>
+
+<div class="content-box">
+    <h3>Summary:</h3>
+    <p id="summary">Loading summary...</p>
+    <div id="loading">Summarizing...</div>
+</div>
+
+<form method="post">
+    <button name="feedback" value="good" {% if bisect_finished %}disabled{% endif %}>Good</button>
+    <button name="feedback" value="bad" {% if bisect_finished %}disabled{% endif %}>Bad</button>
+    <button name="feedback" value="cancel">Cancel</button>
+</form>
+
+<script>
+    async function fetchSummary() {
+        document.getElementById('loading').style.display = 'block';
+        const response = await fetch('/get_summary', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                file_content: document.getElementById('file-content').innerText
+            })
+        });
+        const data = await response.json();
+        document.getElementById('loading').style.display = 'none';
+
+        if (data.bisect_finished) {
+            const commitInfo = document.createElement('div');
+            commitInfo.className = 'bad-commit-highlight';
+            commitInfo.innerText = "First bad commit found: " + data.bad_commit;
+            document.body.insertBefore(commitInfo, document.querySelector('.content-box'));
+
+            document.querySelectorAll('button[name="feedback"]').forEach(btn => {
+                if (btn.value === "good" || btn.value === "bad") {
+                    btn.disabled = true;
+                }
+            });
+        } else {
+            document.getElementById('summary').innerText = data.summary;
+        }
+    }
+
+    fetchSummary();
+</script>
+
+</body>
+</html>

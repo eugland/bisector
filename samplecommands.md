@@ -1,0 +1,1 @@
+ python .\abisector.py repo_url="https://github.com/eugland/testground" repo_path="C:\\Users\\eugen\\Documents\\testground" target_path="game.py" problem="Can you find the code that causes game terminate when only 1 treasure chest is found?"^C

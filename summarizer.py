@@ -25,41 +25,58 @@ class GPTDiffSummarizer(DiffSummarizer):
         if not diff_text or not diff_text.strip() or diff_text.strip() == "No changes.":
             return
         
-        def worker():
-            try:
-                client = self.client
-                print("--- GPT Summary ---")
-                cur = time.time()
-                response = client.chat.completions.create(
-                    # model="gpt-4",
-                    model="gpt-4.1",
-                    # model="o4-mini",
+        
+        try:
+            client = self.client
+            print("--- GPT Summary ---")
+            cur = time.time()
+            response = client.chat.completions.create(
+                # model="gpt-4",
+                model="gpt-4.1",
+                # model="o4-mini",
 
-                    messages=[
-                        {"role": "system", "content": """You are an expert code analysis assistant helping the user perform a git bisect operation. 
-                        Your task is to analyze a code change the user give you and answer the problem that the user asks about answer in json only 
-                        and answer only in boolean or numbers
-                        Also answer should_git_bisect_good when relevant code is not found, or relevant code is found but working properly"""},
-                        {"role": "user", "content": 
-                        "problem: " + self.problem 
-                        + """answer the following in json:
-                        has_compile_error:
-                        relevant_code_found:
-                        relevant_code_introduced:
-                        number_of_relevant_code_occurance:
-                        problem_found:
-                        is_a_good_commit:
-                        chance_of_first_bad_commit:
-                        should_git_bisect_good: \n""" + diff_text
-                        }
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are an expert code-analysis assistant guiding a git-bisect session. "
+                            "Analyse each diff with the eight-step behaviour rubric below and "
+                            "return ONLY the requested JSON. "
+                            "Using the hypotheses above, decide behaviour_change.  Map that decision to bisect_mark (\"good\" or \"bad\") per the table and include it in the JSON."
+                        )
+                    },
+                    {
+                        "role": "user",
+                        "content":
+                            f"target_behaviour: {self.problem}\n\n"
+                            "Return JSON with the following keys:\n"
+                            "has_compile_error: <bool>\n"
+                            "behaviour_change: \"introduces|removes|modifies|no-effect\"\n"
+                            "behaviour_confidence: <0-100>\n"
+                            "sem_edits: [  # list of objects generated via Steps 1-4 above\n"
+                            "  {id:int, kind:str, semantic:bool, behaviour:str, likelihood:int,\n"
+                            "   dependency:str, precedent:str}\n"
+                            "]\n"
+                            "counterfactual_fix: <string>\n"
+                            "reasoning_chain: [\"step1\",\"step2\",\"step3\"]\n"
+                            "reflection: <string>\n"
+                            "\nRubric questions:\n"
+                            "1️⃣ Enumerate edits …\n2️⃣ Mark semantic …\n3️⃣ Hypothesise behaviour …\n"
+                            "4️⃣ List dependencies …\n5️⃣ Precedent …\n6️⃣ Counter-factual …\n"
+                            "7️⃣ Give verdict …\n8️⃣ Confidence & reflection …\n"
+                            "bisect_mark: good | bad"
+                            "\n--- BEGIN DIFF ---\n"
+                            + diff_text +
+                            "\n--- END DIFF ---"
+                    }
                     ]
-                )
-                print(response.choices[0].message.content)
-                print("Time taken:", time.time() - cur)
-            except Exception as e:
-                print(f"[GPT Error] {e}")
-        thread = threading.Thread(target=worker)
-        thread.start()
+            )
+            print(response.choices[0].message.content)
+            print("Time taken:", time.time() - cur)
+            return response.choices[0].message.content
+        except Exception as e:
+            print(f"[GPT Error] {e}")
+        return 'No Changes.'
 
 
 class OpenRouterSummarizer(DiffSummarizer):
@@ -81,30 +98,45 @@ class OpenRouterSummarizer(DiffSummarizer):
                 # model="gpt-4",
                 model="microsoft/mai-ds-r1:free",
                 messages=[
-                        {"role": "system", "content": """You are an expert code analysis assistant helping the user perform a git bisect operation. 
-                        Your task is to analyze a code change the user give you and answer the problem that the user asks about answer in json 
-                        Also answer should_git_bisect_good when relevant code is not found, or relevant code is found but working properly. 
-                        Lastly explain should_git_bisect_good decision"""},
-                        {"role": "user", "content": 
-                        "problem: " + self.problem 
-                        + """answer the following in json:
-                        has_compile_error:
-                        relevant_code_found:
-                        relevant_code_introduced:
-                        number_of_relevant_code_occurance:
-                        problem_found:
-                        is_a_good_commit:
-                        chance_of_first_bad_commit:
-                        should_git_bisect_good:
-                        explanation: \n""" + diff_text
-                        }
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are an expert code-analysis assistant guiding a git-bisect session. "
+                            "Analyse each diff with the eight-step behaviour rubric below and "
+                            "return ONLY the requested JSON."
+                        )
+                    },
+                    {
+                        "role": "user",
+                        "content":
+                            f"target_behaviour: {self.problem}\n\n"
+                            "Return JSON with the following keys:\n"
+                            "has_compile_error: <bool>\n"
+                            "behaviour_change: \"introduces|removes|modifies|no-effect\"\n"
+                            "behaviour_confidence: <0-100>\n"
+                            "sem_edits: [  # list of objects generated via Steps 1-4 above\n"
+                            "  {id:int, kind:str, semantic:bool, behaviour:str, likelihood:int,\n"
+                            "   dependency:str, precedent:str}\n"
+                            "]\n"
+                            "counterfactual_fix: <string>\n"
+                            "reasoning_chain: [\"step1\",\"step2\",\"step3\"]\n"
+                            "reflection: <string>\n"
+                            "\nRubric questions:\n"
+                            "1️⃣ Enumerate edits …\n2️⃣ Mark semantic …\n3️⃣ Hypothesise behaviour …\n"
+                            "4️⃣ List dependencies …\n5️⃣ Precedent …\n6️⃣ Counter-factual …\n"
+                            "7️⃣ Give verdict …\n8️⃣ Confidence & reflection …\n"
+                            "\n--- BEGIN DIFF ---\n"
+                            + diff_text +
+                            "\n--- END DIFF ---"
+                    }
                     ]
             )
             print(self.problem)
             print(response.choices[0].message.content)
-            print("Time taken:", time.time() - cur)
+            return response.choices[0].message.content
         except Exception as e:
             print(f"[Open Router Error] {e}")
+        return 'No changes.'
         
 
 if __name__ == "__main__":
